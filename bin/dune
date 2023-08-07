@@ -1,0 +1,7 @@
+(executable
+ (name mypl)
+ (public_name mypl.qwe)
+ (package mypl)
+ (libraries mycore angstrom)
+ (preprocess
+  (staged_pps ppx_import ppx_jane)))

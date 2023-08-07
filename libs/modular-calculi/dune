@@ -1,0 +1,12 @@
+(include_subdirs unqualified)
+
+(library
+ (name modular_calculi)
+ (public_name modular_calculi)
+ (libraries angstrom mycore)
+ (inline_tests)
+ (preprocess
+  (staged_pps ppx_import ppx_jane)))
+
+(documentation
+ (package modular_calculi))

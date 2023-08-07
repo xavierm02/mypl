@@ -1,0 +1,12 @@
+(include_subdirs unqualified)
+
+(library
+ (name mypl)
+ (package mypl)
+ (libraries angstrom mycore modular_calculi)
+ (inline_tests)
+ (preprocess
+  (staged_pps ppx_import ppx_jane ppx_deriving.map)))
+
+(documentation
+ (package mypl))

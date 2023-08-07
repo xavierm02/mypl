@@ -1,0 +1,12 @@
+(include_subdirs qualified)
+
+(library
+ (name mycore)
+ (package mycore)
+ (libraries core)
+ (inline_tests)
+ (preprocess
+  (staged_pps ppx_import ppx_jane)))
+
+(documentation
+ (package mycore))
