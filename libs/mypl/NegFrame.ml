@@ -57,9 +57,11 @@ module Extend (Subcalculus : Calculus) = struct
 
   module Constructors = struct
     let up n = Up n
+    let up_of_int n = n |> Nat.of_int_exn |> up
     let frame x = Frame x
     let frame_of_alist_exn l = l |> Id.Map.of_alist_exn |> frame
     let proj t x = Proj (t, x)
+    let rec projs t xs = List.fold ~init:t ~f:proj xs
     let join t1 t2 = Join (t1, t2)
   end
 
@@ -83,9 +85,12 @@ module Extend (Subcalculus : Calculus) = struct
             (maybe (s *> char '=' *> s *> term))
         in
         let fields = sep_by (s *> char ';' *> s) field in
-        let frame = lift frame_of_alist_exn (in_braces (s *> fields <* s)) in
+        let frame_literal = lift frame_of_alist_exn (in_braces (s *> fields <* s)) in
+        let up = lift up_of_int (string "Up" *> natural_number) in
         let subcalculus = Subcalculus.parser >>| of_subcalculus in
-        subcalculus <|> frame)
+        let atom = frame_literal <|> up <|> subcalculus in
+        let projection = lift2 projs atom (many (s *> char '.' *> s *> id)) in
+        projection)
     ;;
   end
 
@@ -198,19 +203,71 @@ end
 
 module Inextensible = Extend (Combinators.Empty)
 include Inextensible
+open Modular_calculi.Examples
+open Calculus.Utils.Test (Extend (Arith))
 
-let%expect_test "{a = 1; b = {c = Up1.a}}.b.c = 1" =
-  let open Extend (Examples.Arith.Inextensible) in
-  let t =
-    Proj
-      ( Proj
-          ( Constructors.frame_of_alist_exn
-              [ "a", Def (OfSubcalculus (Examples.Arith.Inextensible.Constructors.int 1))
-              ; "b", Def (Constructors.frame_of_alist_exn [ "c", Def (Proj (Up (Nat.of_int_exn 1), "a")) ])
-              ]
-          , "b" )
-      , "c" )
-  in
-  eval t |> sexp_of_t |> print_s;
-  [%expect {| (OfSubcalculus (Int 1)) |}]
+let%expect_test "Empty frame" =
+  test_parse_eval "{}";
+  [%expect {|
+    {}
+    (Frame())
+    (Frame()) |}]
+;;
+
+let%expect_test "Singleton frame" =
+  test_parse_eval "{a = 1}";
+  [%expect
+    {|
+    {a = 1}
+    (Frame((a(Def(OfSubcalculus(Int 1))))))
+    (Frame((a(Def(OfSubcalculus(Int 1)))))) |}]
+;;
+
+let%expect_test "Projection" =
+  test_parse_eval "{a = 1}.a";
+  [%expect{|
+    {a = 1}.a
+    (Proj(Frame((a(Def(OfSubcalculus(Int 1))))))a)
+    (OfSubcalculus(Int 1)) |}]
+;;
+
+let%expect_test "Double projection (different names)" =
+  test_parse_eval "{a = {b = 1}}.a.b";
+  [%expect{|
+    {a = {b = 1}}.a.b
+    (Proj(Proj(Frame((a(Def(Frame((b(Def(OfSubcalculus(Int 1))))))))))a)b)
+    (OfSubcalculus(Int 1)) |}]
+;;
+
+let%expect_test "Double projection (same name)" =
+  test_parse_eval "{a = {a = 1}}.a.a";
+  [%expect{|
+    {a = {a = 1}}.a.a
+    (Proj(Proj(Frame((a(Def(Frame((a(Def(OfSubcalculus(Int 1))))))))))a)a)
+    (OfSubcalculus(Int 1)) |}]
+;;
+
+let%expect_test "Self projection (of ealier field)" =
+  test_parse_eval "{a = 1; b = Up0.a}.b";
+  [%expect{|
+    {a = 1; b = Up0.a}.b
+    (Proj(Frame((a(Def(OfSubcalculus(Int 1))))(b(Def(Proj(Up(Nat 0))a)))))b)
+    (OfSubcalculus(Int 1)) |}]
+;;
+
+let%expect_test "Self projection (of later field)" =
+  test_parse_eval "{a = Up0.b; b = 1}.a";
+  [%expect{|
+    {a = Up0.b; b = 1}.a
+    (Proj(Frame((a(Def(Proj(Up(Nat 0))b)))(b(Def(OfSubcalculus(Int 1))))))a)
+    (OfSubcalculus(Int 1)) |}]
+;;
+
+let%expect_test "Up1 projection" =
+  test_parse_eval "{a = 1; b = {c = Up1.a}}.b.c";
+  [%expect
+    {|
+    {a = 1; b = {c = Up1.a}}.b.c
+    (Proj(Proj(Frame((a(Def(OfSubcalculus(Int 1))))(b(Def(Frame((c(Def(Proj(Up(Nat 1))a)))))))))b)c)
+    (OfSubcalculus(Int 1)) |}]
 ;;
