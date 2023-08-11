@@ -1,7 +1,6 @@
-(* open! Mycore
+open! Mycore
 open Modular_calculi
-open Qwe__qwe
-open Calculus_intf
+open Calculus.Interfaces
 
 module FieldContent = struct
   type 'a t =
@@ -46,17 +45,15 @@ module Extend (Subcalculus : Calculus) = struct
 
     let t_of_sexp _ = failwith "TODO"
 
-    let typ : t Type.t =
-      Type.create_from_functor
+    let uid : t Calculus.Uid.t =
+      Calculus.Uid.create_from_functor
         ~functor_name:"Frame"
-        ~arg_names:[ Type.name Subcalculus.typ ]
+        ~arg_names:[ Calculus.Uid.name Subcalculus.uid ]
         sexp_of_t
     ;;
   end
 
   include Type
-
-  let self_typ = typ
 
   module Constructors = struct
     let up n = Up n
@@ -96,7 +93,7 @@ module Extend (Subcalculus : Calculus) = struct
   let parse str = Parsing_utils.parse_of_parser parser str
 
   include (
-    Calculus_utils.MapSubterms_of_MapSubtermsMonom.Of1 (struct
+    Calculus.Utils.MapSubterms_of_MapSubtermsMonom.Of1 (struct
       include Type
       module Subcalculus = Subcalculus
 
@@ -142,7 +139,7 @@ module Extend (Subcalculus : Calculus) = struct
   ;;
 
   let of_subcalculus_coercion =
-    Coercion.of_fun_unsafe ~source:Subcalculus.typ ~target:typ of_subcalculus
+    Coercion.of_fun_unsafe ~source:Subcalculus.uid ~target:uid of_subcalculus
   ;;
 
   let to_coerced t =
@@ -160,7 +157,8 @@ module Extend (Subcalculus : Calculus) = struct
     | Proj (t0, x) -> Proj (subst s t0, x)
     | Join (t1, t2) -> Join (subst s t1, subst s t2)
     | OfSubcalculus t0 ->
-      OfSubcalculus (Subcalculus.map_maximal_subterms_of_typ ~typ ~f:(subst s) t0)
+      OfSubcalculus
+        (Subcalculus.map_maximal_subterms_in_calculus ~calculus:uid ~f:(subst s) t0)
 
   and eval t =
     match t with
@@ -194,26 +192,25 @@ module Extend (Subcalculus : Calculus) = struct
     match t with
     | OfSubcalculus t0 ->
       t0 |> Subcalculus.eval_to_coerced |> Coerced.coerce ~f:(failwith "TODO")
-    | Up _ | Frame _ | Proj _ | Join _ -> t |> Coerced.wrap ~typ
+    | Up _ | Frame _ | Proj _ | Join _ -> t |> Coerced.wrap ~calculus:uid
   ;;
 end
 
 module Inextensible = Extend (Combinators.Empty)
 include Inextensible
 
-(* let%expect_test "{a = 1; b = {c = Up1.a}}.b.c = 1" =
-     let open Extend (Arith.Inextensible) in
-     let t =
-       Proj
-         ( Proj
-             ( frame_of_alist_exn
-                 [ "a", Def (OfSubcalculus (Arith.Inextensible.int 1))
-                 ; "b", Def (frame_of_alist_exn [ "c", Def (Proj (Up 1, "a")) ])
-                 ]
-             , "b" )
-         , "c" )
-     in
-     eval t |> sexp_of_t |> print_s;
-     [%expect {| (OfSubcalculus (Int 1)) |}]
-   ;; *)
- *)
+let%expect_test "{a = 1; b = {c = Up1.a}}.b.c = 1" =
+  let open Extend (Examples.Arith.Inextensible) in
+  let t =
+    Proj
+      ( Proj
+          ( Constructors.frame_of_alist_exn
+              [ "a", Def (OfSubcalculus (Examples.Arith.Inextensible.Constructors.int 1))
+              ; "b", Def (Constructors.frame_of_alist_exn [ "c", Def (Proj (Up (Nat.of_int_exn 1), "a")) ])
+              ]
+          , "b" )
+      , "c" )
+  in
+  eval t |> sexp_of_t |> print_s;
+  [%expect {| (OfSubcalculus (Int 1)) |}]
+;;

@@ -17,6 +17,14 @@ module Interfaces : sig
   include module type of Coerced.Interfaces
 end
 
+module Combinators : sig
+  module Empty = Empty
+end
+
+module Examples : sig
+  module Arith = Arith
+end
+
 module Calculus = Calculus
 module Morphism = Morphism
 module Coercion = Coercion
@@ -27,3 +35,5 @@ module Coerced = Coerced
 (** Interfaces relevant to defining modular calculi *)
 
 (** qwwe *)
+
+module Parsing_utils = Parsing_utils
